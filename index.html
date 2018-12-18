@@ -1,52 +1,252 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html>
 <head>
-  <script data-ionic="inject">
-    (function(w){var i=w.Ionic=w.Ionic||{};i.version='3.9.2';i.angular='5.2.9';i.staticDir='build/';})(window);
-  </script>
-  <meta charset="UTF-8">
-  <title>Ionic App</title>
-  <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="msapplication-tap-highlight" content="no">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/foundation/6.3.1/css/foundation.min.css">
+	<script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+	 crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.7.1/clipboard.min.js"></script>
+	<meta name="viewport" content="width=device-width,height=device-height,initial-scale=1.0" />
+	<style>
+		#container.fixedContainer {
+			overflow-y: scroll;
+			position: fixed;
+			height: 200px;
+			top: 200px;
+			width: 700px;
+		}
 
-  <link rel="icon" type="image/x-icon" href="assets/icon/favicon.ico">
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#4e8ef7">
+		.controlPanel {
+			position: fixed;
+    		left: 1080;
+		}
+		
+		.circle {
+			display: inline;
+			background: blue;
+			border-radius: 50%;
+			height: 10px;
+			width: 10px;
+			margin: 0;
+		}
+	
+		.disabled_circle {
+			display: inline;
+			background: gray;
+			border-radius: 50%;
+			height: 10px;
+			width: 10px;
+			margin: 0;
+		}
 
-  <!-- add to homescreen for ios -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
-  <!-- cordova.js required for cordova apps (remove if not needed) -->
-  <script src="cordova.js"></script>
+		.currentLine {
+			font-size: 2em;
+			color:red;
+		}
 
-  <!-- un-comment this code to enable service worker
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js')
-        .then(() => console.log('service worker installed'))
-        .catch(err => console.error('Error', err));
-    }
-  </script>-->
-
-  <link href="build/main.css" rel="stylesheet">
-
+		label {
+			font-weight: bold;
+			font-size: 2em;
+		}
+	</style>
 </head>
+
 <body>
-
-  <!-- Ionic's root component and where the app will load -->
-  <ion-app></ion-app>
-
-  <!-- The polyfills js is generated during the build process -->
-  <script src="build/polyfills.js"></script>
-
-  <!-- The vendor js is generated during the build process
-       It contains all of the dependencies in node_modules -->
-  <script src="build/vendor.js"></script>
-
-  <!-- The main bundle js is generated during the build process -->
-  <script src="build/main.js"></script>
-
+	<div class="row">
+		<div class="large-8 columns fixedContainer" id="container"></div>
+		<div class="large-4 columns controlPanel">
+			<div class="large-12 columns">
+				<label for="bpm">BPM</label>
+				<input id="bpm" type="number" value="120" />
+			</div>
+	
+			<div class="large-12 columns">
+				<label for="bpm">Edit Beats</label>
+				<input class="switch-input" id="beatMode" type="checkbox" name="beatMode">
+				<label class="switch-paddle" for="beatMode">
+					<span class="show-for-sr">Edit Beats</span>
+				</label>
+			</div>
+			<div class="large-12 columns">
+				<label for="lyrics">Lyrics</label>
+				<textarea rows="10" id="lyrics" style="font-size:1em;" onclick="insertText('^')">E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a &#13;&#10;tera karun tera karun din gin gin ke&#13;&#10;intezaar aaja piya aayi bahar&#13;&#10;E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a &#13;&#10;tera karun tera karun din gin gin ke&#13;&#10;intezaar aaja piya aayi bahar</textarea>
+			</div>
+			<input type="button" value="Start" onclick="restart();" />
+	</div>
 </body>
+
 </html>
+
+<script>
+	var bpm;
+	var duration;
+	var barCount;
+	var _rowData;
+	var beatCount;
+	var rowCount;
+	var beatLoop;
+	var lyrics;
+	var beatElements;
+	var lastFocused;
+	var topPosition;
+
+	$(document).ready(function () {
+		initLF();
+		restart();
+		
+	});
+
+	function initLF() {
+		$("textarea").focus(function() {
+			lastFocused = document.activeElement;
+		});
+	}
+
+	function initializeCountAndBPM() {
+		bpm = $('#bpm').val();
+		duration = 1 / (bpm / 60 / 1000);
+		barCount = 0;
+		_rowData = $();
+		beatCount = 0;
+		rowCount = 0;
+	}
+
+	function getPosition(elm) {
+		if (elm !== undefined) {
+			var beatPosition = $(elm).position();
+			if (barCount > 0) {
+				$('#circle_' + (barCount - 1)).removeClass('circle').addClass('disabled_circle');
+				if (beatPosition.top != topPosition) {
+					// This means new Row has changed and needs to be bigger size
+					rowCount++;
+					$('.currentLine').removeClass('currentLine');
+					$('#beatBar_' + rowCount).parent().next().addClass('currentLine');
+					// Scroll by 20px
+					$('#container').scrollTop($('#container').scrollTop()+45);
+					beatPosition = $(elm).position();
+					topPosition = beatPosition.top;
+					
+
+				}
+			} else {
+				// This means bar has just begin hence top line can be bigger size.
+				topPosition = beatPosition.top;
+			}
+			$('#container').append('<span class="circle" id="circle_' + barCount + '" style="position:absolute;left:' + beatPosition.left + 'px; top:' + (beatPosition.top - 20) + 'px;"></span>');
+		}
+	}
+
+	function restart() {
+		stopBeatLoop();
+		initializeCountAndBPM();
+		clearScreen();
+		createBeatSpan();
+		printLyrics();
+		// _rowData = createRow();
+		createQuarterBeatLoop();
+	}
+
+	function createBeatSpan() {
+		lyrics = $('#lyrics').val();
+		lyrics = lyrics.replace(/\^/g, '<span class="beat"></span>');
+	}
+
+	function stopBeatLoop() {
+		if (beatLoop !== null && beatLoop !== undefined) {
+			clearTimeout(beatLoop);
+		}
+	}
+
+	function clearScreen() {
+		$('#container').html('');
+	}
+
+	function printLyrics() {
+		var lines = lyrics.split('\n');
+		$.each(lines, function (i, v) {
+			var $lyrics = $('<div class="row"><div class="large-12 columns">' + v + '</div></div>');
+			var $beatBarOnTop = $('<div class="row"><div class="large-12 columns" id="beatBar_' + i + '">&nbsp;</div></div>');
+			$('#container').append($beatBarOnTop);
+			$('#container').append($lyrics);
+		});
+		// set first line to big
+		$('#beatBar_'+rowCount).parent().next().addClass('currentLine');
+		// Now fill the global beatElements
+		beatElements = $('.beat');
+		
+
+
+	}
+
+	function createRow() {
+
+		barCount = 0;
+		var $rowData = $('#beatBar_' + rowCount)
+		rowCount++;
+		return $rowData;
+	}
+
+
+
+	function createQuarterBeatLoop() {
+		var beatChar = '_';
+		// reset Beat Count
+		if (beatCount == 4) {
+			getPosition(beatElements[barCount]);
+			beatCount = 0;
+			beatChar = '^';
+			barCount++;
+			if (barCount%8 == 0) {
+				// _rowData = createRow();
+			}
+			
+			
+		}
+
+		var $beat = $('<span>' + beatChar + '</span>');
+		 _rowData.append($beat);
+		beatLoop = setTimeout(function () {
+			beatCount++;
+			createQuarterBeatLoop();
+		}, duration / 2);
+	}
+
+// This method is only to insert caret character by the click of mouse under textarea
+	function insertText(text) {
+		if($('#beatMode').is(':checked')) {
+			var input = lastFocused;
+			if (input == undefined) { return; }
+			var scrollPos = input.scrollTop;
+			var pos = 0;
+			var browser = ((input.selectionStart || input.selectionStart == "0") ?
+				"ff" : (document.selection ? "ie" : false));
+			if (browser == "ie") {
+				input.focus();
+				var range = document.selection.createRange();
+				range.moveStart("character", -input.value.length);
+				pos = range.text.length;
+			}
+			else if (browser == "ff") { pos = input.selectionStart };
+
+			var front = (input.value).substring(0, pos);
+			var back = (input.value).substring(pos, input.value.length);
+			if(front.endsWith('\n') || front == '' || front.endsWith('^')) { text = '.'+text; }
+			input.value = front + text + back;
+			pos = pos + text.length;
+			if (browser == "ie") {
+				input.focus();
+				var range = document.selection.createRange();
+				range.moveStart("character", -input.value.length);
+				range.moveStart("character", pos);
+				range.moveEnd("character", 0);
+				range.select();
+			}
+			else if (browser == "ff") {
+				input.selectionStart = pos;
+				input.selectionEnd = pos;
+				input.focus();
+			}
+			input.scrollTop = scrollPos;
+		}
+	}
+</script>
