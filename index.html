@@ -1,5 +1,5 @@
-<!DOCTYPE html>
 <html>
+
 <head>
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/foundation/6.3.1/css/foundation.min.css">
 	<script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
@@ -7,13 +7,14 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.7.1/clipboard.min.js"></script>
 	<meta name="viewport" content="width=device-width,height=device-height,initial-scale=1.0" />
 	<style>
-		#container.fixedContainer {
+		 #container.fixedContainer {
 			overflow-y: scroll;
 			position: fixed;
-			height: 200px;
+			height: 250px;
 			top: 200px;
 			width: 700px;
-		}
+			white-space: nowrap;
+		} 
 
 		.controlPanel {
 			position: fixed;
@@ -21,45 +22,78 @@
 		}
 		
 		.circle {
-			display: inline;
+			display: inline-block;
 			background: blue;
 			border-radius: 50%;
-			height: 10px;
-			width: 10px;
-			margin: 0;
+			height: 12px;
+			width: 12px;
+			margin-left: -5px;
+    		margin-right: -5px;
 		}
 	
 		.disabled_circle {
-			display: inline;
+			display: inline-block;
 			background: gray;
 			border-radius: 50%;
-			height: 10px;
-			width: 10px;
+			height: 8px;
+			width: 8px;
 			margin: 0;
 		}
 
-
 		.currentLine {
-			font-size: 2em;
-			color:red;
+			font-size: 1.6em;
+			color:brown;
+			margin-top: -10px;
 		}
 
 		label {
 			font-weight: bold;
-			font-size: 2em;
+			font-size: 1.5em;
+		}
+
+		textarea {
+			font-size: 0.85em;
+		}
+
+		.chord {
+			color: red;
+    		font-weight: bold;
+			margin-left: -24px;
+			font-size: 1.2em;
+			position: absolute;
+		}
+
+		.currentBarChords {
+			font-size: 2.5em;
+			/* position: fixed; */
+			/* top: 125px; */
+		}
+
+		.currentBeatChord {
+			color: blue;
+		}
+
+		.currentLine .chord {
+    		font-size: 0.9em;
 		}
 	</style>
 </head>
 
 <body>
+
 	<div class="row">
-		<div class="large-8 columns fixedContainer" id="container"></div>
-		<div class="large-4 columns controlPanel">
-			<div class="large-12 columns">
-				<label for="bpm">BPM</label>
-				<input id="bpm" type="number" value="120" />
+		<div class="large-9 columns fixedContainer" id="container"></div>
+		<div class="large-3 columns controlPanel">
+			<div class="row">
+				<div class="large-12 columns currentBarChords" id="currentBarChords">
+				</div>
 			</div>
-	
+
+			<div class="large-12 columns">
+				<label for="bpm">BPM:<span id="displayBpm"></span></label>
+				<input id="bpm" type="range" min="30" max="240" value="120" onchange="updateBpmText();" />
+			</div>
+
 			<div class="large-12 columns">
 				<label for="bpm">Edit Beats</label>
 				<input class="switch-input" id="beatMode" type="checkbox" name="beatMode">
@@ -69,10 +103,14 @@
 			</div>
 			<div class="large-12 columns">
 				<label for="lyrics">Lyrics</label>
-				<textarea rows="10" id="lyrics" style="font-size:1em;" onclick="insertText('^')">E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a &#13;&#10;tera karun tera karun din gin gin ke&#13;&#10;intezaar aaja piya aayi bahar&#13;&#10;E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a &#13;&#10;tera karun tera karun din gin gin ke&#13;&#10;intezaar aaja piya aayi bahar</textarea>
+				<textarea rows="10" id="lyrics" onclick="insertText('^')">E^k do te^en cha^ar paanch cheh sa^at&#13;&#10;aath nau d^us gyara^h b^arah ter^a&#13;&#10;E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a&#13;&#10;t^era karun^ t^era karun d^in gin gin k^e&#13;&#10;i^ntezaar aa^ja piya a^ayi bah^ar
+
+
+
+				</textarea>
 			</div>
-			<input type="button" value="Start" onclick="restart();" />
-	</div>
+			<input type="button" value="Re-Start" onclick="restart();" />
+		</div>
 </body>
 
 </html>
@@ -81,6 +119,7 @@
 	var bpm;
 	var duration;
 	var barCount;
+	var syncedBarCount;
 	var _rowData;
 	var beatCount;
 	var rowCount;
@@ -95,6 +134,16 @@
 		restart();
 		
 	});
+	
+	function updateBpmText() {
+		bpm = $('#bpm').val();
+		$('#displayBpm').html(bpm );
+		calculateDurationForBPM();
+	}
+	
+	function calculateDurationForBPM() {
+		duration = 1 / (bpm / 60 / 1000);
+	}
 
 	function initLF() {
 		$("textarea").focus(function() {
@@ -104,51 +153,78 @@
 
 	function initializeCountAndBPM() {
 		bpm = $('#bpm').val();
-		duration = 1 / (bpm / 60 / 1000);
+		updateBpmText();
 		barCount = 0;
+		syncedBarCount = 0;
 		_rowData = $();
 		beatCount = 0;
 		rowCount = 0;
 	}
 
-	function getPosition(elm) {
-		if (elm !== undefined) {
-			var beatPosition = $(elm).position();
-			if (barCount > 0) {
-				$('#circle_' + (barCount - 1)).removeClass('circle').addClass('disabled_circle');
-				if (beatPosition.top != topPosition) {
-					// This means new Row has changed and needs to be bigger size
-					rowCount++;
-					$('.currentLine').removeClass('currentLine');
-					$('#beatBar_' + rowCount).parent().next().addClass('currentLine');
-					// Scroll by 20px
-					$('#container').scrollTop($('#container').scrollTop()+45);
-					beatPosition = $(elm).position();
-					topPosition = beatPosition.top;
-					
-
-				}
-			} else {
-				// This means bar has just begin hence top line can be bigger size.
-				topPosition = beatPosition.top;
+	function beatSignal(elm, previousElm) {
+		var $elm = $(elm);
+		var elmId = $elm.parent().attr('id');
+		var lyricsElmId = elmId.replace(/beatBar_/g, 'lyricsLine_');
+		if(previousElm != undefined) {
+			var prevElmId = $(previousElm).parent().attr('id');
+			var prevLyricsElmId = prevElmId.replace(/beatBar_/g, 'lyricsLine_');
+			if(prevLyricsElmId != lyricsElmId) {
+				// Line has changed 
+				$('#'+prevLyricsElmId).removeClass('currentLine');
+				$('#'+prevElmId).removeClass('currentLine');
+				// Set all previous circles to gray.
+				$('.circle').removeClass('circle').addClass('disabled_circle');
+				updateTopChordsBar($elm);
 			}
-			$('#container').append('<span class="circle" id="circle_' + barCount + '" style="position:absolute;left:' + beatPosition.left + 'px; top:' + (beatPosition.top - 20) + 'px;"></span>');
+		} else {
+			updateTopChordsBar($elm);
 		}
+		if(!$('#'+lyricsElmId).hasClass('currentLine')) {
+			$('#'+lyricsElmId).addClass('currentLine');
+			$('#'+elmId).addClass('currentLine');
+		}
+		$elm.addClass('circle');
+		// Scroll to current line in the view.	
+		elm.parentElement.scrollIntoView();
+		highlightCurrentChord($elm, elmId);
+		
+	}
+
+	function highlightCurrentChord($elm, elmId) {
+		$('.currentBeatChord').removeClass('currentBeatChord');
+		$elm.next('span').addClass('currentBeatChord');
+		var topChordId = elmId.replace(/beatBar_/g, 'topChord_');
+		$('#'+topChordId+'_'+barCount).addClass('currentBeatChord');
+	}
+
+	function updateTopChordsBar($elm) {
+		var chordSpanArray = $('#'+$elm.parent().attr('id') + ' .chord');
+		var chordText = '';
+		var topChordId = $elm.parent().attr('id').replace(/beatBar_/g, 'topChord_');
+		$.each(chordSpanArray, function(i, v) {
+			if(chordText !== '') {
+				chordText = chordText + '-' + '<span id="'+topChordId+'_'+syncedBarCount+'">'+$(v).html()+'</span>';
+			} else {
+				chordText = '<span id="'+topChordId+'_'+syncedBarCount+'">'+$(v).html()+'</span>';
+			}
+			syncedBarCount++;
+		});
+
+		$('#currentBarChords').html(chordText);
 	}
 
 	function restart() {
 		stopBeatLoop();
 		initializeCountAndBPM();
 		clearScreen();
-		createBeatSpan();
+		getLyrics();
 		printLyrics();
-		// _rowData = createRow();
 		createQuarterBeatLoop();
 	}
 
-	function createBeatSpan() {
-		lyrics = $('#lyrics').val();
-		lyrics = lyrics.replace(/\^/g, '<span class="beat"></span>');
+	function getLyrics() {
+		lyrics = $('#lyrics').val();	
+		// lyrics = lyrics + '&#13;&#10;&#13;&#10;&#13;&#10;&#13;&#10;&#13;&#10;';
 	}
 
 	function stopBeatLoop() {
@@ -161,50 +237,75 @@
 		$('#container').html('');
 	}
 
+/*
+E^k do te^en cha^ar paanch cheh sa^at ~F#|F#|F#|F#
+
+aath nau d^us gyara^h b^arah ter^a ~F#|F#m|C#|C#
+
+E^k do te^en cha^ar paanch cheh sa^at  ~F#|F#|F#|F#
+
+aath nau d^us gyara^h b^arah ter^a ~F#|F#m|C#|C#
+
+t^era karun^ t^era karun d^in gin gin k^e ~F#m|F#m|F#m|F#m|C#
+
+i^ntezaar aa^ja piya a^ayi bah^ar^ ~C#|F#m|C#|F#|F#
+
+[m1] d^rum^... r^oll^ -- d^rum^... r^oll^ ~1.|2.|3.|4.|1.|2.|3.|4.
+
+E^k do te^en cha^ar paanch cheh sa^at ~F#|F#|F#|F#
+aath nau d^us gyara^h b^arah ter^a ~F#|F#m|C#|C#
+E^k do te^en cha^ar paanch cheh sa^at  ~F#|F#|F#|F#
+aath nau d^us gyara^h b^arah ter^a ~F#|F#m|C#|C#
+t^era karun^ t^era karun d^in gin gin k^e ~F#m|F#m|F#m|F#m|C#
+i^ntezaar aa^ja piya a^ayi bah^ar ~C#|F#m|C#|F#
+*/
 	function printLyrics() {
 		var lines = lyrics.split('\n');
+		lines.splice(0, 0, '4^----3^----2^----1^------4^----3^----2^----1^'); 
 		$.each(lines, function (i, v) {
-			var $lyrics = $('<div class="row"><div class="large-12 columns">' + v + '</div></div>');
-			var $beatBarOnTop = $('<div class="row"><div class="large-12 columns" id="beatBar_' + i + '">&nbsp;</div></div>');
-			$('#container').append($beatBarOnTop);
+            var cleanLyrics = v.replace(/\^/g, '');
+			if(cleanLyrics.indexOf('~') > 0) {
+				cleanLyrics = cleanLyrics.substring(0, cleanLyrics.indexOf('~'));
+			}
+			
+			var $lyrics = $('<div class="row"><div class="large-12 columns" id="lyricsLine_' + i + '">' + cleanLyrics + '</div></div>');
+            var beatSpan = v.replace(/\^/g, '<span class="beat"></span><span class="chord"></span>');
+			var $beatBarOnTop = $('<div class="row"><div class="large-12 columns" style="color:transparent;margin-bottom:-5px;" id="beatBar_' + i + '">' + beatSpan + '</div></div>');
+			$('#container').append($beatBarOnTop)
+			printChordsOnLyrics(i, v);
 			$('#container').append($lyrics);
 		});
 		// set first line to big
-		$('#beatBar_'+rowCount).parent().next().addClass('currentLine');
+		// $('#beatBar_'+rowCount).parent().next().addClass('currentLine');
 		// Now fill the global beatElements
 		beatElements = $('.beat');
-		
-
-
 	}
 
-	function createRow() {
-
-		barCount = 0;
-		var $rowData = $('#beatBar_' + rowCount)
-		rowCount++;
-		return $rowData;
+	function printChordsOnLyrics(lineNum, v) {
+		if(v.indexOf('~') > 0) {
+			var chordArray = v.substring(v.indexOf('~')+1).split('|');
+			var chordSpanArray = $('#beatBar_'+lineNum+' .chord');
+			$.each(chordSpanArray, function(i, chordSpan) {
+				if(chordArray[i] != undefined && chordArray[i] != null) {
+					$(chordSpan).html(chordArray[i]);
+				}
+			});
+		}
 	}
-
-
 
 	function createQuarterBeatLoop() {
-		var beatChar = '_';
 		// reset Beat Count
 		if (beatCount == 4) {
-			getPosition(beatElements[barCount]);
-			beatCount = 0;
-			beatChar = '^';
-			barCount++;
-			if (barCount%8 == 0) {
-				// _rowData = createRow();
+			if(beatElements[barCount] != undefined && beatElements[barCount] != null) {
+				// Generate beat signal after 4 beats
+				beatSignal(beatElements[barCount], beatElements[barCount-1]);
+				beatCount = 0;
+				barCount++;
+			} else {
+				stopBeatLoop();
 			}
 			
-			
 		}
-
-		var $beat = $('<span>' + beatChar + '</span>');
-		 _rowData.append($beat);
 		beatLoop = setTimeout(function () {
 			beatCount++;
 			createQuarterBeatLoop();
