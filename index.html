@@ -82,8 +82,8 @@
 <body>
 
 	<div class="row">
-		<div class="large-9 small-12 columns fixedContainer " id="container"></div>
-		<div class="large-3 small-12 columns controlPanel">
+		<div class="large-9 columns fixedContainer" id="container"></div>
+		<div class="large-3 columns controlPanel">
 			<div class="row">
 				<div class="large-12 columns currentBarChords" id="currentBarChords">
 				</div>
@@ -96,14 +96,21 @@
 
 			<div class="large-12 columns">
 				<label for="bpm">Edit Beats</label>
-				<input class="switch-input" id="beatMode" type="checkbox" name="beatMode">
+				<input class="small switch-input" id="beatMode" type="checkbox" name="beatMode">
 				<label class="switch-paddle" for="beatMode">
 					<span class="show-for-sr">Edit Beats</span>
 				</label>
 			</div>
 			<div class="large-12 columns">
+				<label for="transpose">Transpose</label>
+				<div class="small button-group">
+				  <a class="button" onclick="transpose(true);">+</a>
+				  <a class="button" onclick="transpose(false);">-</a>
+				</div>
+			</div>
+			<div class="large-12 columns">
 				<label for="lyrics">Lyrics</label>
-				<textarea rows="10" id="lyrics" onclick="insertText('^')">E^k do te^en cha^ar paanch cheh sa^at&#13;&#10;aath nau d^us gyara^h b^arah ter^a&#13;&#10;E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a&#13;&#10;t^era karun^ t^era karun d^in gin gin k^e&#13;&#10;i^ntezaar aa^ja piya a^ayi bah^ar
+				<textarea rows="10" id="lyrics" onclick="insertText('^')">E^k do te^en cha^ar paanch cheh sa^at ~F#|F#|F#|F#&#13;&#10;aath nau d^us gyara^h b^arah ter^a&#13;&#10;E^k do te^en cha^ar paanch cheh sa^at &#13;&#10;aath nau d^us gyara^h b^arah ter^a&#13;&#10;t^era karun^ t^era karun d^in gin gin k^e&#13;&#10;i^ntezaar aa^ja piya a^ayi bah^ar
 
 
 
@@ -128,12 +135,61 @@
 	var beatElements;
 	var lastFocused;
 	var topPosition;
+	
+	var chordSequence = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
 
 	$(document).ready(function () {
 		initLF();
 		restart();
 		
 	});
+	
+	function transpose(up) {
+		$.each($('.chord'),function(i,v) {
+			var chordText = $(v).html();
+			if(chordText !== undefined && chordText.length > 0) {
+				$(v).html(getNewChordText(chordText, up));
+			}
+		});
+	}
+	
+	function getTransposedChord(up, chordIndex) {
+		var newChord = '';
+		if (chordIndex >= 0) {
+			if (up) {
+				if (chordIndex != chordSequence.length - 1) {
+					newChord = chordSequence[chordIndex + 1];
+				} else {
+					newChord = chordSequence[0];
+				}
+			} else {
+				if (chordIndex != 0) {
+					newChord = chordSequence[chordIndex - 1];
+				} else {
+					newChord = chordSequence[chordSequence.length - 1];
+				}
+			}
+		}
+		return newChord;
+	}
+	
+
+	
+	function getNewChordText(chordText, up) {
+		var chordIndex = $.inArray(chordText, chordSequence);
+		var newChord = '';
+		var lastChar = '';
+ 
+		// This if will trigger if chord is anything other chordSequence ex: F#7 F#m etc.
+		while(chordIndex < 0 && chordText.length > 0) {
+			lastChar = chordText.substr(chordText.length-1,chordText.length) + lastChar;
+			chordText = chordText.substr(0,chordText.length-1);
+			chordIndex = $.inArray(chordText, chordSequence);
+		} 
+		newChord = getTransposedChord(up,chordIndex) + lastChar;
+		
+		return newChord;
+	}
 	
 	function updateBpmText() {
 		bpm = $('#bpm').val();
